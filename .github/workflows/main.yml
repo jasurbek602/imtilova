@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -21,13 +21,35 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Bog'liqliklarni o'rnatish
+      - name: Bog'liqliklarni o'rnatish (SDK ga mos versiyalar)
         run: |
           npm install
+          npx expo install expo@~54.0.0
+          npx expo install \
+            expo-audio expo-haptics expo-linear-gradient expo-location \
+            expo-notifications expo-status-bar \
+            @react-native-async-storage/async-storage \
+            react-native-screens react-native-safe-area-context \
+            react-native @expo/vector-icons
           npx expo install --fix
+
+      - name: Diagnostika (versiyalar)
+        continue-on-error: true
+        run: |
+          npm ls expo expo-modules-autolinking expo-modules-core || true
+          npx expo-doctor || true
 
       - name: Native Android loyihasini yaratish (prebuild)
         run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Diagnostika (versiyasiz modullar)
+        continue-on-error: true
+        run: |
+          npx expo-modules-autolinking resolve --platform android --json | node -e "
+          const j=JSON.parse(require('fs').readFileSync(0,'utf8'));
+          for(const m of j.modules||[]) for(const p of m.projects||[])
+            if(!p.publication||!p.publication.version) console.log('VERSIONSIZ:', m.packageName, m.packageVersion);
+          " || true
 
       - uses: gradle/actions/setup-gradle@v4
 
