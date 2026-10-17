@@ -1,0 +1,44 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Bog'liqliklarni o'rnatish
+        run: |
+          npm install
+          npx expo install --fix
+
+      - name: Native Android loyihasini yaratish (prebuild)
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: APK yig'ish (faqat arm64 — Samsung S22 uchun)
+        working-directory: android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: APK ni yuklash
+        uses: actions/upload-artifact@v4
+        with:
+          name: islom-yoli-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
