@@ -1,50 +1,36 @@
-# python3 scripts/gen_icon.py -> assets/icon.png, adaptive-icon.png (islomiy: yarim oy + sakkiz qirrali yulduz)
-import math
-from PIL import Image, ImageDraw, ImageFilter
-S = 1024
-GOLD = (212, 175, 55, 255)
+# python3 scripts/gen_icon.py  ->  assets/icon.png va assets/adaptive-icon.png
+# Oddiy ikonka: ko'k fon + o'rtada oltin yarim oy
+from PIL import Image, ImageDraw
 
-def star8(d, cx, cy, r, color, width=0):
-    # Rub el Hizb: ikki kvadrat (45° burilgan)
-    for rot in (0, 45):
-        pts = [(cx + r*math.cos(math.radians(rot + 90*i + 45)), cy + r*math.sin(math.radians(rot + 90*i + 45))) for i in range(4)]
-        if width: d.polygon(pts, outline=color, width=width)
-        else: d.polygon(pts, fill=color)
+SIZE = 1024
+SS = 2                      # silliq qirralar uchun 2x chizib, kichraytiramiz
+BLUE = (11, 36, 87)         # #0b2457 (app.json dagi adaptiveIcon.backgroundColor bilan bir xil)
+GOLD = (212, 175, 55)
 
-def motif(size, scale):
-    """Shaffof fonda oltin motiv (scale: motivning kattaligi)."""
-    im = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    c = size / 2
-    R = size * scale / 2
-    d.ellipse([c-R, c-R, c+R, c+R], outline=GOLD, width=int(size*0.012))       # tashqi halqa
-    star8(d, c, c, R*0.93, GOLD, width=int(size*0.008))                         # geometrik naqsh
-    # yarim oy: katta doira - siljigan doira
-    r = R*0.62
-    moon = Image.new('L', (size, size), 0)
-    md = ImageDraw.Draw(moon)
-    md.ellipse([c-r-R*0.06, c-r, c+r-R*0.06, c+r], fill=255)
-    md.ellipse([c-r*0.78+R*0.22, c-r*0.82, c+r*1.18+R*0.22-r*0.4, c+r*0.82+0], fill=0)
-    gold = Image.new('RGBA', (size, size), GOLD)
-    im.paste(gold, (0, 0), moon)
-    # kichik yulduz
-    sx, sy, sr = c + R*0.30, c - R*0.02, R*0.17
-    star8(d, sx, sy, sr, GOLD)
-    return im
+def crescent_mask(size, scale):
+    s = size * SS
+    c = s / 2
+    R = s * scale / 2                       # tashqi doira radiusi
+    m = Image.new('L', (s, s), 0)
+    d = ImageDraw.Draw(m)
+    d.ellipse([c - R, c - R, c + R, c + R], fill=255)
+    r = R * 0.80                            # kesuvchi doira (ichki bo'sh joy)
+    ox, oy = R * 0.38, -R * 0.12            # siljish -> oy o'ng-yuqoriga ochiladi
+    d.ellipse([c + ox - r, c + oy - r, c + ox + r, c + oy + r], fill=0)
+    return m.resize((size, size), Image.LANCZOS)
 
-# 1) Asosiy ikonka: gradient fon + motiv
-bg = Image.new('RGBA', (S, S))
-px = bg.load()
-for y in range(S):
-    for x in range(S):
-        t = (x + y) / (2*S)
-        px[x, y] = (int(6 + 8*t), int(18 + 30*t), int(46 + 55*t), 255)
-glow = Image.new('RGBA', (S, S), (0, 0, 0, 0))
-ImageDraw.Draw(glow).ellipse([S*0.2, S*0.2, S*0.8, S*0.8], fill=(212, 175, 55, 45))
-bg = Image.alpha_composite(bg, glow.filter(ImageFilter.GaussianBlur(80)))
-bg = Image.alpha_composite(bg, motif(S, 0.78))
-bg.convert('RGB').save('assets/icon.png')
+def crescent_layer(size, scale):
+    layer = Image.new('RGBA', (size, size), GOLD + (255,))
+    layer.putalpha(crescent_mask(size, scale))
+    return layer
 
-# 2) Adaptive ikonka (Android): shaffof, xavfsiz zona ichida (~62%)
-motif(S, 0.62).save('assets/adaptive-icon.png')
+# 1) Asosiy ikonka: ko'k fon + oy
+icon = Image.new('RGBA', (SIZE, SIZE), BLUE + (255,))
+icon.alpha_composite(crescent_layer(SIZE, 0.56))
+icon.convert('RGB').save('assets/icon.png')
+
+# 2) Android adaptive ikonka: shaffof fon + oy (fonni app.json beradi)
+adaptive = Image.new('RGBA', (SIZE, SIZE), (0, 0, 0, 0))
+adaptive.alpha_composite(crescent_layer(SIZE, 0.44))
+adaptive.save('assets/adaptive-icon.png')
 print('ok')
